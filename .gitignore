@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+profile_default/
+ipython_config.py
+
+# VS Code
+.vscode/
+
+# Project specific
+results/*
+!results/.gitkeep
+models/*
+!models/.gitkeep
+data/*
+!data/raw/
+!data/processed/
