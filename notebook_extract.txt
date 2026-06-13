@@ -1,0 +1,856 @@
+
+--- CELL 8 ---
+print("=" * 60)
+print("  🔬 DATA DIAGNOSTICS & OVERFIT TEST")
+print("=" * 60)
+
+diag_ds = LITSDataset(TRAIN_CSV, DATA_ROOT, augment=False)
+print(f"\nDataset size: {len(diag_ds)} samples")
+
+# ────────────────────────────────────────────────────────
+# 1. MASK INTEGRITY CHECK
+# ────────────────────────────────────────────────────────
+print("\n" + "-" * 50)
+print("1. MASK INTEGRITY CHECK (scanning 500 random samples)")
+print("-" * 50)
+
+np.random.seed(42)
+scan_indices = np.random.choice(len(diag_ds), min(500, len(diag_ds)), replace=False)
+
+n_liver = 0
+n_tumor = 0
+n_empty = 0
+
+for idx in scan_indices:
+    img, msk = diag_ds[int(idx)]
+    if msk[0].sum().item() > 0: n_liver += 1
+    if msk[1].sum().item() > 0: n_tumor += 1
+    if msk[0].sum().item() == 0 and msk[1].sum().item() == 0: n_empty += 1
+
+print(f"  Scanned: {len(scan_indices)} samples")
+print(f"  Liver non-empty: {n_liver} ({100*n_liver/len(scan_indices):.1f}%)")
+print(f"  Tumor non-empty: {n_tumor} ({100*n_tumor/len(scan_indices):.1f}%)")
+print(f"  Both empty:      {n_empty} ({100*n_empty/len(scan_indices):.1f}%)")
+assert n_liver > 10, f"CRITICAL: Only {n_liver} liver samples in 500!"
+print("  ✅ Mask integrity OK")
+
+# ────────────────────────────────────────────────────────
+# 2. VISUALIZE 4 RANDOM LIVER-CONTAINING SAMPLES
+# ────────────────────────────────────────────────────────
+print("\n" + "-" * 50)
+print("2. SAMPLE VISUALIZATION")
+print("-" * 50)
+
+liver_indices = []
+for idx in scan_indices:
+    _, msk = diag_ds[int(idx)]
+    if msk[0].sum().item() > 0:
+        liver_indices.append(int(idx))
+    if len(liver_indices) >= 4: break
+
+if len(liver_indices) >= 4:
+    fig, axes = plt.subplots(4, 3, figsize=(12, 16))
+    for r, idx in enumerate(liver_indices[:4]):
+        img, msk = diag_ds[idx]
+        axes[r, 0].imshow(img[0].numpy(), cmap='gray')
+        axes[r, 0].set_title(f'CT (idx={idx})', fontsize=10)
+        axes[r, 1].imshow(msk[0].numpy(), cmap='Reds')
+        axes[r, 1].set_title(f'Liver ({msk[0].sum().item():.0f}px)', fontsize=10)
+        axes[r, 2].imshow(msk[1].numpy(), cmap='Reds')
+        axes[r, 2].set_title(f'Tumor ({msk[1].sum().item():.0f}px)', fontsize=10)
+        for ax in axes[r]: ax.axis('off')
+    plt.suptitle('Data Diagnostic: 4 liver-containing samples', fontsize=14)
+    plt.tight_layout()
+    os.makedirs('results', exist_ok=True)
+    plt.savefig('results/data_diagnostic.png', dpi=100, bbox_inches='tight')
+    plt.show()
+    print("  Saved: results/data_diagnostic.png")
+
+# ────────────────────────────────────────────────────────
+# 3. SINGLE-BATCH OVERFIT TEST (50 steps)
+# ────────────────────────────────────────────────────────
+print("\n" + "-" * 50)
+print("3. OVERFIT TEST (50 steps)")
+print("-" * 50)
+
+overfit_loader = DataLoader(diag_ds, batch_size=16, shuffle=True, num_workers=0)
+test_imgs, test_msks = next(iter(overfit_loader))
+attempts = 0
+while test_msks[:, 0].sum().item() == 0 and attempts < 10:
+    test_imgs, test_msks = next(iter(overfit_loader))
+    attempts += 1
+
+print(f"  Batch liver pixels: {test_msks[:, 0].sum().item():.0f}")
+print(f"  Batch tumor pixels: {test_msks[:, 1].sum().item():.0f}")
+
+device = torch.device('cuda')
+test_model = UNet(1, 2).to(device)
+test_criterion = CombinedLoss().to(device)
+test_opt = optim.Adam(test_model.parameters(), lr=1e-3)
+
+test_imgs_gpu = test_imgs.to(device)
+test_msks_gpu = test_msks.to(device)
+
+losses = []
+for step in range(50):
+    test_opt.zero_grad()
+    with torch.amp.autocast('cuda'):
+        out = test_model(test_imgs_gpu)
+        loss = test_criterion(out, test_msks_gpu)
+    loss.backward()
+    test_opt.step()
+    losses.append(loss.item())
+    if step % 10 == 0:
+        dl, dt, dm = dice_score(out, test_msks_gpu)
+        print(f"  Step {step:02d}: loss={loss.item():.4f}, liver={dl:.4f}, tumor={dt:.4f}")
+
+print(f"\n  Loss: {losses[0]:.4f} → {losses[-1]:.4f} (change: {losses[-1]-losses[0]:+.4f})")
+if losses[-1] < losses[0] * 0.9:
+    print("  ✅ OVERFIT TEST PASSED — model can learn!")
+else:
+    print("  ⚠️ WARNING: Loss did not decrease significantly.")
+
+del test_model, test_criterion, test_opt, test_imgs_gpu, test_msks_gpu
+torch.cuda.empty_cache()
+del diag_ds
+
+print("\n" + "=" * 60)
+print("  DIAGNOSTICS COMPLETE — Ready to train")
+print("=" * 60)
+--- CELL 10 ---
+print("=" * 50)
+print("  RUNNING SANITY CHECKS")
+print("=" * 50)
+
+# 1. Model shape
+m = UNet(1, 2)
+d = torch.randn(2, 1, 256, 256)
+o = m(d)
+assert o.shape == (2, 2, 256, 256), f"SHAPE FAIL: {o.shape}"
+params = sum(p.numel() for p in m.parameters())
+print(f"[1] Model: {d.shape} → {o.shape}, params={params:,} ✓")
+
+# 2. Kaiming init check
+for name, param in m.named_parameters():
+    if 'weight' in name and any(layer in name for layer in ['.0.weight', '.3.weight', 'up.weight', 'head.weight']):
+        assert param.std() > 0.001, f"Init FAIL: {name} has std={param.std():.6f}"
+print(f"[2] Kaiming init: all conv weights properly initialized ✓")
+
+# 3. Dataset
+ds = LITSDataset(TRAIN_CSV, DATA_ROOT, augment=True)
+img, msk = ds[0]
+assert img.shape == (1, 256, 256) and img.dtype == torch.float32
+assert msk.shape == (2, 256, 256) and msk.dtype == torch.float32
+assert img.min() >= 0 and img.max() <= 1.0
+assert set(msk.unique().tolist()).issubset({0.0, 1.0})
+print(f"[3] Dataset: img={img.shape}, mask={msk.shape}, range=[0,1], binary ✓")
+
+# 4. Loss: plain BCE + Dice, no NaN
+loss_fn = CombinedLoss()
+tgt = torch.randint(0, 2, (2, 2, 256, 256)).float()
+loss_val = loss_fn(o, tgt)
+assert not torch.isnan(loss_val) and not torch.isinf(loss_val)
+print(f"[4] Loss: {loss_val.item():.4f} (plain BCE+Dice, no pos_weight) ✓")
+
+# 5. Dice metric
+dl, dt, dm = dice_score(o, tgt)
+assert isinstance(dl, float) and isinstance(dt, float)
+print(f"[5] Dice: liver={dl:.4f}, tumor={dt:.4f}, mean={dm:.4f} ✓")
+
+# 6. AMP test on GPU
+dev = torch.device('cuda')
+m_g = m.to(dev); d_g = d.to(dev); t_g = tgt.to(dev)
+loss_fn_g = CombinedLoss().to(dev)
+with torch.amp.autocast('cuda'):
+    o_a = m_g(d_g)
+    l_a = loss_fn_g(o_a, t_g)
+assert not torch.isnan(l_a) and not torch.isinf(l_a)
+print(f"[6] AMP: loss={l_a.item():.4f} (no NaN) ✓")
+
+# 7. Gradient flow
+opt_t = optim.Adam(m_g.parameters(), lr=1e-4)
+scaler_t = torch.amp.GradScaler('cuda')
+opt_t.zero_grad(set_to_none=True)
+scaler_t.scale(l_a).backward()
+scaler_t.unscale_(opt_t)
+torch.nn.utils.clip_grad_norm_(m_g.parameters(), max_norm=1.0)
+scaler_t.step(opt_t)
+scaler_t.update()
+grads_ok = all(p.grad is not None for p in m_g.parameters() if p.requires_grad)
+print(f"[7] Gradients: {'ALL OK' if grads_ok else 'MISSING!'} ✓")
+
+# 8. Augmentation — masks stay binary
+for i in range(5):
+    _, msk_aug = ds[i]
+    assert set(msk_aug.unique().tolist()).issubset({0.0, 1.0})
+print(f"[8] Augmentation: masks stay binary ✓")
+
+del m, m_g, d, d_g, o, o_a, ds, tgt, t_g, loss_fn, loss_fn_g
+torch.cuda.empty_cache()
+print("\n✅ ALL 8 CHECKS PASSED — SAFE TO TRAIN!")
+--- CELL 12 ---
+# ═══════════════════════════════════════════════════════════════
+# CONFIG — v7: Final Training Pipeline
+# ═══════════════════════════════════════════════════════════════
+BATCH          = 32          # PAPER: batch 32 > 16, 64, 128
+EPOCHS         = 100         # PAPER: model stabilizes ~epoch 60
+LR             = 1e-4        # PAPER: standard for Adam on medical segmentation
+GRAD_CLIP      = 10.0        # v7.1: single clip for both AMP & FP32 (norms are 2-12 after unscale_)
+PATIENCE       = 10          # PAPER: early stopping patience
+LR_PAT         = 5           # PAPER: LR scheduler patience
+LR_FACTOR      = 0.5         # PAPER: halve LR on plateau
+WORKERS        = 2
+WARMUP_EPOCHS  = 3           # v6: warmup 3 epochs from any start point
+MAX_INF_PER_EPOCH = 5        # v6: if >5 Inf batches, switch to FP32 mid-epoch
+
+# ★ RESUME: Set this to the path of your previous output dataset.
+#   Example: "/kaggle/input/your-previous-output-dataset/models/best_model.pth"
+#   Leave as None to auto-detect.
+PREV_CHECKPOINT = None
+
+device = torch.device("cuda")
+print("=" * 60)
+print("  LIVER AI — v7 Final Training Pipeline")
+print("=" * 60)
+print(f"Device:       {torch.cuda.get_device_name(0)}")
+print(f"Batch:        {BATCH} (paper-proven)")
+print(f"Epochs:       {EPOCHS} (early stop at {PATIENCE})")
+print(f"Optimizer:    AdamW (lr={LR}, wd=1e-5) — v7")
+print(f"Loss:         0.5*BCE + 0.5*Dice — NO pos_weight")
+print(f"Grad clip:    {GRAD_CLIP} (after unscale_, same for AMP & FP32)")
+print(f"AMP:          ON (with Inf cascade protection)")
+print(f"Warmup:       {WARMUP_EPOCHS} epochs from start_epoch")
+print(f"LR Scheduler: ReduceLR(patience={LR_PAT}, factor={LR_FACTOR})")
+print("=" * 60)
+
+os.makedirs("models", exist_ok=True)
+os.makedirs("results", exist_ok=True)
+
+# ---- DATA ----
+print("\nLoading data...")
+train_ds = LITSDataset(TRAIN_CSV, DATA_ROOT, augment=True)
+val_ds   = LITSDataset(VAL_CSV,   DATA_ROOT, augment=False)
+train_ld = DataLoader(train_ds, batch_size=BATCH, shuffle=True,  pin_memory=True, num_workers=WORKERS)
+val_ld   = DataLoader(val_ds,   batch_size=BATCH, shuffle=False, pin_memory=True, num_workers=WORKERS)
+print(f"Train: {len(train_ds):,} samples ({len(train_ld)} batches)")
+print(f"Val:   {len(val_ds):,} samples ({len(val_ld)} batches)")
+
+# ---- MODEL + LOSS + OPTIMIZER (paper-aligned) ----
+model     = UNet(1, 2).to(device)
+criterion = CombinedLoss().to(device)  # plain BCE + Dice, NO pos_weight
+optimizer = optim.AdamW(model.parameters(), lr=LR, weight_decay=1e-5)  # v7: AdamW for regularization
+scaler    = torch.amp.GradScaler('cuda', init_scale=1024)  # v7: lower init_scale prevents Inf spiral
+
+# ── CHECKPOINT SEARCH ─────────────────────────────────────────
+CKPT_BEST   = "models/best_model.pth"
+CKPT_LATEST = "models/latest_model.pth"
+
+start_epoch   = 1
+best_val_loss = float("inf")
+weights_only_resume = False
+
+def find_prev_checkpoint():
+    """Search /kaggle/input/ for checkpoints from previous notebook output."""
+    if PREV_CHECKPOINT and os.path.exists(PREV_CHECKPOINT):
+        return PREV_CHECKPOINT
+    patterns = [
+        "/kaggle/input/*/models/best_model.pth",
+        "/kaggle/input/*/*/models/best_model.pth",
+    ]
+    for pat in patterns:
+        matches = glob.glob(pat)
+        if matches:
+            return matches[0]
+    return None
+
+# Try current working dir first
+resume_ckpt = None
+if os.path.exists(CKPT_LATEST):
+    resume_ckpt = CKPT_LATEST
+    weights_only_resume = False
+elif os.path.exists(CKPT_BEST):
+    resume_ckpt = CKPT_BEST
+    weights_only_resume = False
+else:
+    prev = find_prev_checkpoint()
+    if prev:
+        resume_ckpt = prev
+        weights_only_resume = True
+
+if resume_ckpt:
+    print(f"\n📂 Found checkpoint: {resume_ckpt}")
+    ckpt = torch.load(resume_ckpt, map_location=device, weights_only=False)
+    model.load_state_dict(ckpt["model_state_dict"])
+    
+    if weights_only_resume:
+        print(f"   🔄 WEIGHTS-ONLY resume (from previous version)")
+        print(f"   Previous epoch: {ckpt['epoch']}, val_loss: {ckpt['val_loss']:.4f}")
+        print(f"   ⚠️ Optimizer and scaler reset — fresh start with pretrained weights")
+        print(f"   ✅ Warmup will apply for {WARMUP_EPOCHS} epochs from epoch 1")
+    else:
+        # v7.2: Safe optimizer restore — handles Adam→AdamW transition
+        try:
+            optimizer.load_state_dict(ckpt["optimizer_state_dict"])
+            print(f"   ✅ Optimizer state restored")
+        except (ValueError, RuntimeError) as e:
+            print(f"   ⚠️ Optimizer state incompatible (likely Adam→AdamW change): {e}")
+            print(f"   → Using fresh AdamW optimizer with pretrained weights")
+            weights_only_resume = True  # treat as weights-only
+        # v6: ALSO restore GradScaler state
+        if not weights_only_resume and "scaler_state_dict" in ckpt:
+            scaler.load_state_dict(ckpt["scaler_state_dict"])
+            print(f"   ✅ GradScaler state restored")
+        start_epoch   = ckpt["epoch"] + 1
+        best_val_loss = ckpt.get("best_val_loss", ckpt["val_loss"])
+        print(f"   🔄 FULL resume from epoch {start_epoch}, best_val_loss={best_val_loss:.4f}")
+        print(f"   ✅ Warmup will apply for {WARMUP_EPOCHS} epochs from epoch {start_epoch}")
+else:
+    print("\n🆕 Starting fresh — no checkpoint found.")
+
+scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+    optimizer, mode="min", factor=LR_FACTOR, patience=LR_PAT
+)
+
+# ═══════════════════════════════════════════════════════════════
+# FIX #5: WARMUP relative to start_epoch, not absolute
+# ═══════════════════════════════════════════════════════════════
+def set_lr(optimizer, lr):
+    for pg in optimizer.param_groups:
+        pg['lr'] = lr
+
+def get_warmup_lr(current_epoch, start_ep, base_lr, warmup_epochs):
+    """Linear warmup relative to start_epoch.
+    
+    epoch=start_ep   → base_lr * 0.1
+    epoch=start_ep+2 → base_lr * 1.0  (for warmup_epochs=3)
+    """
+    relative = current_epoch - start_ep + 1  # 1, 2, 3...
+    if relative > warmup_epochs:
+        return base_lr
+    return base_lr * (0.1 + 0.9 * (relative - 1) / max(1, warmup_epochs - 1))
+
+# ── TRAINING LOOP ─────────────────────────────────────────────
+no_improve    = 0
+log           = []
+global_t0     = time.time()
+epoch_times   = []
+nan_recovery  = False    # v6: True if we just recovered from NaN
+use_amp       = True     # v6: can be disabled during recovery
+warmup_end_epoch = start_epoch + WARMUP_EPOCHS - 1  # v6: warmup ends here
+
+# v7.1: Training Health Monitor
+consecutive_amp_off = 0     # count epochs where AMP stayed off
+best_val_dice_liver = 0.0   # track best validation Dice (separate from loss)
+dice_no_improve = 0         # epochs where val Dice didn't improve
+
+print(f"\n🎯 Training plan: epochs {start_epoch}→{EPOCHS}")
+print(f"   Warmup: epochs {start_epoch}→{warmup_end_epoch}")
+print(f"   Scheduler active after epoch {warmup_end_epoch}")
+
+for epoch in range(start_epoch, EPOCHS + 1):
+    t0 = time.time()
+
+    # ═══════════════════════════════════════════════════════════
+    # FIX #2: WARMUP always runs for WARMUP_EPOCHS from start
+    # ═══════════════════════════════════════════════════════════
+    if epoch <= warmup_end_epoch:
+        warmup_lr = get_warmup_lr(epoch, start_epoch, LR, WARMUP_EPOCHS)
+        set_lr(optimizer, warmup_lr)
+        print(f"  🔥 Warmup: lr={warmup_lr:.2e}")
+
+    # v6: If recovering from NaN/catastrophe, disable AMP for this epoch
+    if nan_recovery:
+        use_amp = False
+        print(f"  🛡️ AMP DISABLED for recovery epoch (fp32 mode)")
+    else:
+        use_amp = True
+
+    # ==== TRAIN ====
+    model.train()
+    t_loss = 0.0
+    t_dl_sum, t_dt_sum = 0.0, 0.0
+    n_batches_ok = 0
+    nan_in_epoch = False
+    max_grad_norm = 0.0
+    inf_count_this_epoch = 0  # v6 FIX #3: Inf cascade counter
+
+    for imgs, msks in tqdm(train_ld, desc=f"E{epoch:02d} Train", leave=False, miniters=50, mininterval=10.0):
+        imgs = imgs.to(device, non_blocking=True)
+        msks = msks.to(device, non_blocking=True)
+        optimizer.zero_grad(set_to_none=True)
+
+        # v6: conditional AMP
+        if use_amp:
+            with torch.amp.autocast('cuda'):
+                preds = model(imgs)
+                loss  = criterion(preds, msks)
+        else:
+            preds = model(imgs)
+            loss  = criterion(preds, msks)
+
+        # ★ NaN DETECTION
+        if torch.isnan(loss) or torch.isinf(loss):
+            print(f"\n  ⚠️ NaN/Inf loss at epoch {epoch}, skipping batch")
+            nan_in_epoch = True
+            optimizer.zero_grad(set_to_none=True)
+            continue
+
+        if use_amp:
+            scaler.scale(loss).backward()
+            scaler.unscale_(optimizer)
+            grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=GRAD_CLIP)
+            
+            # ═══════════════════════════════════════════════════
+            # FIX #3: Inf cascade protection
+            # ═══════════════════════════════════════════════════
+            if torch.isnan(grad_norm) or torch.isinf(grad_norm):
+                inf_count_this_epoch += 1
+                # DON'T call scaler.step() — just update() to adjust scale
+                scaler.update()
+                optimizer.zero_grad(set_to_none=True)
+                
+                if inf_count_this_epoch <= 3:
+                    print(f"\n  ⚠️ Inf gradient norm ({inf_count_this_epoch}/{MAX_INF_PER_EPOCH}), scaler skip")
+                
+                if inf_count_this_epoch >= MAX_INF_PER_EPOCH:
+                    print(f"\n  🛡️ Inf cascade detected ({inf_count_this_epoch} events) — disabling AMP for rest of epoch")
+                    use_amp = False
+                    # v7: DON'T reset scaler — let it adapt its scale down naturally
+                    # The scaler.update() calls above already halve the scale on each Inf
+                continue
+            
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            loss.backward()
+            grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=GRAD_CLIP)
+            optimizer.step()
+
+        t_loss += loss.item()
+        if not (torch.isnan(grad_norm) or torch.isinf(grad_norm)):
+            max_grad_norm = max(max_grad_norm, grad_norm.item())
+        dl, dt, _ = dice_score(preds, msks)
+        t_dl_sum += dl
+        t_dt_sum += dt
+        n_batches_ok += 1
+
+    # v6: Handle full-epoch NaN
+    if n_batches_ok == 0:
+        print(f"\n💀 ALL batches had NaN loss in epoch {epoch}!")
+        print(f"   🔄 Resetting GradScaler and loading best checkpoint...")
+        # v7: FULL RECOVERY — conservative scaler, load best model
+        scaler = torch.amp.GradScaler('cuda', init_scale=1024)  # v7: lower init_scale
+        if os.path.exists(CKPT_BEST):
+            ckpt = torch.load(CKPT_BEST, map_location=device, weights_only=False)
+            model.load_state_dict(ckpt["model_state_dict"])
+            optimizer = optim.AdamW(model.parameters(), lr=LR * 0.5, weight_decay=1e-5)  # v7: AdamW
+            scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer, mode="min", factor=LR_FACTOR, patience=LR_PAT)
+            if "scaler_state_dict" in ckpt:
+                scaler.load_state_dict(ckpt["scaler_state_dict"])
+            no_improve = 0  # FIX #6: reset patience
+            print(f"   ✅ Rolled back to best model (epoch {ckpt['epoch']})")
+            print(f"   ✅ Fresh optimizer (lr={LR*0.5:.1e}) + scaler + scheduler")
+        nan_recovery = True  # next epoch runs in fp32
+        continue
+    else:
+        nan_recovery = False  # successful epoch, resume AMP
+
+    t_loss   /= n_batches_ok
+    t_dl_avg = t_dl_sum / n_batches_ok
+    t_dt_avg = t_dt_sum / n_batches_ok
+
+    # ==== VALIDATE ====
+    model.eval()
+    v_loss = 0.0
+    v_dl_sum, v_dt_sum = 0.0, 0.0
+    n_val = 0
+
+    with torch.no_grad():
+        for imgs, msks in tqdm(val_ld, desc=f"E{epoch:02d} Val", leave=False, miniters=50, mininterval=10.0):
+            imgs = imgs.to(device, non_blocking=True)
+            msks = msks.to(device, non_blocking=True)
+            # v7: match val precision to training (AMP or FP32)
+            if use_amp:
+                with torch.amp.autocast('cuda'):
+                    preds = model(imgs)
+                    loss  = criterion(preds, msks)
+            else:
+                preds = model(imgs)
+                loss  = criterion(preds, msks)
+            if not (torch.isnan(loss) or torch.isinf(loss)):
+                v_loss += loss.item()
+                dl, dt, _ = dice_score(preds, msks)
+                v_dl_sum += dl
+                v_dt_sum += dt
+                n_val += 1
+
+    if n_val > 0:
+        v_loss   /= n_val
+        v_dl_avg = v_dl_sum / n_val
+        v_dt_avg = v_dt_sum / n_val
+    else:
+        v_loss = float('inf')
+        v_dl_avg = 0.0
+        v_dt_avg = 0.0
+        print(f"  ⚠️ All validation batches had NaN loss!")
+
+    # ═══════════════════════════════════════════════════════════
+    # FIX #4: CATASTROPHIC SPIKE DETECTION + AUTO-ROLLBACK
+    # ═══════════════════════════════════════════════════════════
+    if v_loss > best_val_loss * 2.0 and best_val_loss < float('inf'):
+        print(f"\n  🚨 CATASTROPHIC SPIKE: val_loss={v_loss:.4f} > 2× best={best_val_loss:.4f}")
+        print(f"  🔄 Auto-rolling back to best checkpoint...")
+        if os.path.exists(CKPT_BEST):
+            ckpt = torch.load(CKPT_BEST, map_location=device, weights_only=False)
+            model.load_state_dict(ckpt["model_state_dict"])
+            # Use a lower LR after catastrophe to prevent recurrence
+            recovery_lr = LR * 0.5
+            optimizer = optim.AdamW(model.parameters(), lr=recovery_lr, weight_decay=1e-5)  # v7: AdamW
+            scaler = torch.amp.GradScaler('cuda', init_scale=1024)  # v7: lower init_scale
+            scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer, mode="min", factor=LR_FACTOR, patience=LR_PAT)
+            no_improve = 0  # FIX #6: reset patience counter
+            nan_recovery = True  # next epoch runs in fp32 for safety
+            print(f"  ✅ Rolled back to best model (epoch {ckpt['epoch']})")
+            print(f"  ✅ Recovery LR={recovery_lr:.1e}, next epoch in FP32")
+            # Log the spike but continue
+            log.append({"epoch": epoch, "train_loss": t_loss, "val_loss": v_loss,
+                        "train_dice_liver": t_dl_avg, "train_dice_tumor": t_dt_avg,
+                        "val_dice_liver": v_dl_avg, "val_dice_tumor": v_dt_avg,
+                        "lr": optimizer.param_groups[0]["lr"],
+                        "time_s": time.time() - t0, "max_grad_norm": max_grad_norm,
+                        "amp": use_amp, "event": "CATASTROPHIC_ROLLBACK"})
+            pd.DataFrame(log).to_csv("results/training_log.csv", index=False)
+            continue
+        else:
+            print(f"  ⚠️ No best checkpoint found to rollback to!")
+
+    # Only step scheduler after warmup
+    if epoch > warmup_end_epoch:
+        scheduler.step(v_loss)
+    
+    epoch_time = time.time() - t0
+    epoch_times.append(epoch_time)
+    lr = optimizer.param_groups[0]["lr"]
+
+    print(f"\nEpoch {epoch:03d}/{EPOCHS} ({epoch_time:.0f}s) LR={lr:.1e}")
+    print(f"  Train | Loss: {t_loss:.4f} | Liver: {t_dl_avg:.4f} | Tumor: {t_dt_avg:.4f}")
+    print(f"  Val   | Loss: {v_loss:.4f} | Liver: {v_dl_avg:.4f} | Tumor: {v_dt_avg:.4f}")
+    print(f"  Grad  | Max norm: {max_grad_norm:.4f} | AMP: {'ON' if use_amp else 'OFF (recovery)'}")
+    if inf_count_this_epoch > 0:
+        print(f"  ⚠️ {inf_count_this_epoch} Inf gradient events this epoch")
+    if nan_in_epoch:
+        print(f"  ⚠️ Some batches had NaN loss this epoch (skipped)")
+
+    # Log
+    log.append({"epoch": epoch, "train_loss": t_loss, "val_loss": v_loss,
+                "train_dice_liver": t_dl_avg, "train_dice_tumor": t_dt_avg,
+                "val_dice_liver": v_dl_avg, "val_dice_tumor": v_dt_avg,
+                "lr": lr, "time_s": epoch_time, "max_grad_norm": max_grad_norm,
+                "amp": use_amp, "event": ""})
+    pd.DataFrame(log).to_csv("results/training_log.csv", index=False)
+
+    # ═══════════════════════════════════════════════════════════
+    # v7.2: TRAINING WATCHDOG — AUTO-STOP ON FAILURE
+    # Based on PyTorch Lightning EarlyStopping pattern:
+    #   check_finite → divergence → amp_failure → dice_stagnation → patience
+    # ═══════════════════════════════════════════════════════════
+    stop_training = False
+    stop_reason = ""
+    
+    # --- CHECK 1: Non-finite val_loss (Lightning: check_finite) ---
+    if not (v_loss == float('inf') and n_val == 0):  # skip if no valid batches (handled elsewhere)
+        if v_loss != v_loss or v_loss == float('inf') or v_loss == float('-inf'):  # NaN/Inf check
+            stop_training = True
+            stop_reason = f"NON_FINITE: val_loss={v_loss} is not finite. Training has diverged."
+    
+    # --- CHECK 2: Loss divergence (Lightning: divergence_threshold) ---
+    DIVERGENCE_THRESHOLD = 5.0  # if val_loss exceeds this, model has diverged beyond recovery
+    if not stop_training and v_loss > DIVERGENCE_THRESHOLD and epoch > warmup_end_epoch:
+        stop_training = True
+        stop_reason = f"DIVERGENCE: val_loss={v_loss:.4f} > threshold={DIVERGENCE_THRESHOLD}. Model diverged."
+    
+    # --- CHECK 3: AMP failure (pipeline-specific) ---
+    if not use_amp:
+        consecutive_amp_off += 1
+    else:
+        consecutive_amp_off = 0
+    
+    AMP_FAILURE_PATIENCE = 5  # if AMP off for 5 consecutive epochs, something is fundamentally wrong
+    if not stop_training and consecutive_amp_off >= AMP_FAILURE_PATIENCE:
+        stop_training = True
+        stop_reason = (f"AMP_FAILURE: AMP has been OFF for {consecutive_amp_off} consecutive epochs. "
+                       f"Training is 2x slower and likely unstable. Scaler scale: {scaler.get_scale():.1f}")
+    
+    # --- CHECK 4: Dice stagnation (metric-specific) ---
+    current_val_dice = v_dl_avg  # liver Dice — primary metric for healthcare model
+    if current_val_dice > best_val_dice_liver:
+        best_val_dice_liver = current_val_dice
+        dice_no_improve = 0
+    else:
+        dice_no_improve += 1
+    
+    DICE_STAGNATION_PATIENCE = 15  # generous — allows LR reductions to take effect
+    if not stop_training and dice_no_improve >= DICE_STAGNATION_PATIENCE and epoch > warmup_end_epoch + 5:
+        stop_training = True
+        stop_reason = (f"DICE_STAGNATION: Val Liver Dice has NOT improved for {dice_no_improve} epochs. "
+                       f"Current: {current_val_dice:.4f}, Best: {best_val_dice_liver:.4f}")
+    
+    # --- CHECK 5: Gradient health ---
+    if not stop_training and max_grad_norm > 500.0:
+        stop_training = True
+        stop_reason = f"GRADIENT_EXPLOSION: max_grad_norm={max_grad_norm:.1f} > 500. Gradients have exploded."
+    elif not stop_training and max_grad_norm < 1e-6 and n_batches_ok > 10 and epoch > warmup_end_epoch:
+        stop_training = True
+        stop_reason = f"GRADIENT_COLLAPSE: max_grad_norm={max_grad_norm:.8f}. Training has collapsed."
+    
+    # --- Log health status (always, for post-mortem analysis) ---
+    if consecutive_amp_off > 0:
+        print(f"  🏥 AMP OFF for {consecutive_amp_off}/{AMP_FAILURE_PATIENCE} epochs")
+    if dice_no_improve > 0:
+        print(f"  🏥 Dice stagnant for {dice_no_improve}/{DICE_STAGNATION_PATIENCE} epochs (best: {best_val_dice_liver:.4f})")
+    if max_grad_norm > 100.0:
+        print(f"  🏥 Gradient norm high: {max_grad_norm:.1f} (expected: 2-15)")
+    
+    # --- EXECUTE STOP ---
+    if stop_training:
+        print(f"\n{'🛑'*20}")
+        print(f"  WATCHDOG: AUTOMATIC TRAINING STOP")
+        print(f"  Reason: {stop_reason}")
+        print(f"  Best val_loss: {best_val_loss:.4f}")
+        print(f"  Best Liver Dice: {best_val_dice_liver:.4f}")
+        print(f"{'🛑'*20}")
+        # Save final state before stopping
+        log.append({"epoch": epoch, "train_loss": t_loss, "val_loss": v_loss,
+                     "train_dice_liver": t_dl_avg, "train_dice_tumor": t_dt_avg,
+                     "val_dice_liver": v_dl_avg, "val_dice_tumor": v_dt_avg,
+                     "lr": lr, "time_s": epoch_time, "max_grad_norm": max_grad_norm,
+                     "amp": use_amp, "event": f"WATCHDOG_STOP: {stop_reason}"})
+        pd.DataFrame(log).to_csv("results/training_log.csv", index=False)
+        break
+
+    # ★ SAVE LATEST EVERY EPOCH (v6: includes scaler state)
+    torch.save({
+        "epoch": epoch,
+        "model_state_dict": model.state_dict(),
+        "optimizer_state_dict": optimizer.state_dict(),
+        "scaler_state_dict": scaler.state_dict(),
+        "val_loss": v_loss,
+        "best_val_loss": best_val_loss
+    }, CKPT_LATEST)
+    print(f"  💾 Latest checkpoint saved (epoch {epoch})")
+
+    # Save best model
+    if v_loss < best_val_loss:
+        best_val_loss = v_loss
+        no_improve = 0
+        torch.save({
+            "epoch": epoch,
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "scaler_state_dict": scaler.state_dict(),
+            "val_loss": v_loss,
+            "best_val_loss": best_val_loss
+        }, CKPT_BEST)
+        print(f"  ⭐ BEST MODEL SAVED (val_loss={v_loss:.4f})")
+    else:
+        no_improve += 1
+        print(f"  ⏳ No improvement ({no_improve}/{PATIENCE})")
+
+    # Early stopping
+    if no_improve >= PATIENCE:
+        print(f"\n🛑 Early stopping at epoch {epoch}")
+        break
+
+
+
+print("\n" + "=" * 60)
+print(f"  TRAINING COMPLETE — Best val_loss: {best_val_loss:.4f}")
+print(f"  Best Liver Dice: {best_val_dice_liver:.4f}")
+print(f"  Latest checkpoint: epoch {epoch}")
+print(f"  Total time: {(time.time() - global_t0)/3600:.2f} hours")
+if stop_training:
+    print(f"  Stop reason: {stop_reason}")
+elif no_improve >= PATIENCE:
+    print(f"  Stop reason: EARLY_STOPPING (patience={PATIENCE} exhausted)")
+else:
+    print(f"  Stop reason: COMPLETED all {EPOCHS} epochs")
+print("=" * 60)
+
+
+
+--- CELL 20 ---
+print("=" * 70)
+print("  📋 GENERATING METRICS DASHBOARD")
+print("=" * 70)
+
+fig = plt.figure(figsize=(24, 16))
+fig.patch.set_facecolor('#1a1a2e')
+
+# ── Title ─────────────────────────────────────────────────────
+fig.suptitle('Liver & Tumor Segmentation — Model Evaluation Dashboard',
+             fontsize=22, fontweight='bold', color='white', y=0.98)
+
+# ── ROW 1: Metric Cards ──────────────────────────────────────
+card_data = [
+    ('Liver Dice',   f"{metrics['Liver']['Dice']:.4f}",   '#2ecc71'),
+    ('Tumor Dice',   f"{metrics['Tumor']['Dice']:.4f}",   '#e74c3c'),
+    ('Mean Dice',    f"{mean_dice:.4f}",                   '#3498db'),
+    ('Liver IoU',    f"{metrics['Liver']['IoU']:.4f}",     '#27ae60'),
+    ('Tumor IoU',    f"{metrics['Tumor']['IoU']:.4f}",     '#c0392b'),
+    ('Mean IoU',     f"{mean_iou:.4f}",                    '#2980b9'),
+    ('Pixel Acc',    f"{pixel_acc*100:.2f}%",              '#f39c12'),
+    ('Best Epoch',   f"{ckpt['epoch']}",                   '#9b59b6'),
+]
+
+for i, (label, value, color) in enumerate(card_data):
+    ax = fig.add_axes([0.02 + i * 0.12, 0.82, 0.11, 0.12])
+    ax.set_facecolor('#16213e')
+    for spine in ax.spines.values():
+        spine.set_color(color)
+        spine.set_linewidth(2)
+    ax.set_xticks([]); ax.set_yticks([])
+    ax.text(0.5, 0.65, value, ha='center', va='center',
+            fontsize=20, fontweight='bold', color=color,
+            transform=ax.transAxes)
+    ax.text(0.5, 0.25, label, ha='center', va='center',
+            fontsize=10, color='#bdc3c7', transform=ax.transAxes)
+
+# ── ROW 2 LEFT: Training Curves ──────────────────────────────
+log_path = 'results/training_log.csv'
+if os.path.exists(log_path):
+    df_log = pd.read_csv(log_path)
+    valid_epochs = df_log.dropna(subset=['val_loss'])
+
+    ax1 = fig.add_axes([0.06, 0.42, 0.28, 0.32])
+    ax1.set_facecolor('#16213e')
+    ax1.plot(valid_epochs['epoch'], valid_epochs['train_loss'],
+             'c-', linewidth=2, label='Train Loss')
+    ax1.plot(valid_epochs['epoch'], valid_epochs['val_loss'],
+             '#f39c12', linewidth=2, label='Val Loss')
+    ax1.set_title('Loss Curve', fontsize=13, color='white', pad=10)
+    ax1.set_xlabel('Epoch', fontsize=10, color='#bdc3c7')
+    ax1.set_ylabel('Loss', fontsize=10, color='#bdc3c7')
+    ax1.legend(fontsize=9, facecolor='#16213e', edgecolor='white',
+               labelcolor='white')
+    ax1.tick_params(colors='#bdc3c7')
+    ax1.grid(True, alpha=0.2)
+    for spine in ax1.spines.values(): spine.set_color('#34495e')
+
+    ax2 = fig.add_axes([0.38, 0.42, 0.28, 0.32])
+    ax2.set_facecolor('#16213e')
+    ax2.plot(valid_epochs['epoch'], valid_epochs['val_dice_liver'],
+             '#2ecc71', linewidth=2, label='Val Liver Dice')
+    ax2.plot(valid_epochs['epoch'], valid_epochs['val_dice_tumor'],
+             '#e74c3c', linewidth=2, label='Val Tumor Dice')
+    ax2.set_title('Validation Dice', fontsize=13, color='white', pad=10)
+    ax2.set_xlabel('Epoch', fontsize=10, color='#bdc3c7')
+    ax2.set_ylabel('Dice', fontsize=10, color='#bdc3c7')
+    ax2.set_ylim(0, 1)
+    ax2.legend(fontsize=9, facecolor='#16213e', edgecolor='white',
+               labelcolor='white')
+    ax2.tick_params(colors='#bdc3c7')
+    ax2.grid(True, alpha=0.2)
+    for spine in ax2.spines.values(): spine.set_color('#34495e')
+
+# ── ROW 2 RIGHT: Per-Channel Detail Table ─────────────────────
+ax3 = fig.add_axes([0.70, 0.42, 0.28, 0.32])
+ax3.set_facecolor('#16213e')
+ax3.set_xticks([]); ax3.set_yticks([])
+ax3.set_title('Per-Channel Metrics', fontsize=13, color='white', pad=10)
+for spine in ax3.spines.values(): spine.set_color('#34495e')
+
+table_rows = [
+    ('Metric',     'Liver',  'Tumor'),
+    ('Dice',       f"{metrics['Liver']['Dice']:.4f}",      f"{metrics['Tumor']['Dice']:.4f}"),
+    ('IoU',        f"{metrics['Liver']['IoU']:.4f}",       f"{metrics['Tumor']['IoU']:.4f}"),
+    ('Precision',  f"{metrics['Liver']['Precision']:.4f}", f"{metrics['Tumor']['Precision']:.4f}"),
+    ('Recall',     f"{metrics['Liver']['Recall']:.4f}",    f"{metrics['Tumor']['Recall']:.4f}"),
+    ('F1 Score',   f"{metrics['Liver']['F1']:.4f}",        f"{metrics['Tumor']['F1']:.4f}"),
+    ('Specificity',f"{metrics['Liver']['Specificity']:.4f}",f"{metrics['Tumor']['Specificity']:.4f}"),
+]
+for i, (metric, liver_v, tumor_v) in enumerate(table_rows):
+    y = 0.88 - i * 0.12
+    is_header = (i == 0)
+    weight = 'bold' if is_header else 'normal'
+    color = 'white' if is_header else '#bdc3c7'
+    ax3.text(0.05, y, metric, ha='left', va='center', fontsize=10,
+             fontweight=weight, color=color, transform=ax3.transAxes)
+    ax3.text(0.55, y, liver_v, ha='center', va='center', fontsize=10,
+             fontweight=weight, color='#2ecc71' if not is_header else color,
+             transform=ax3.transAxes)
+    ax3.text(0.85, y, tumor_v, ha='center', va='center', fontsize=10,
+             fontweight=weight, color='#e74c3c' if not is_header else color,
+             transform=ax3.transAxes)
+
+# ── ROW 3 LEFT: Confusion Matrix Bars ─────────────────────────
+ax4 = fig.add_axes([0.06, 0.05, 0.40, 0.28])
+ax4.set_facecolor('#16213e')
+cm_labels = ['TP', 'FP', 'FN', 'TN']
+for ch, (name, color) in enumerate([('Liver', '#2ecc71'), ('Tumor', '#e74c3c')]):
+    values = [tp[ch].item(), fp[ch].item(), fn[ch].item(), tn[ch].item()]
+    total = sum(values)
+    pcts = [v/total*100 for v in values]
+    x = np.arange(4) + ch * 0.35
+    bars = ax4.bar(x, pcts, 0.3, color=color, alpha=0.8, label=name)
+    for bar, pct in zip(bars, pcts):
+        if pct > 0.5:
+            ax4.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.3,
+                     f'{pct:.1f}%', ha='center', va='bottom',
+                     fontsize=8, color='white')
+
+ax4.set_xticks(np.arange(4) + 0.175)
+ax4.set_xticklabels(cm_labels, fontsize=10, color='#bdc3c7')
+ax4.set_title('Confusion Matrix (% of pixels)', fontsize=13, color='white', pad=10)
+ax4.set_ylabel('Percentage', fontsize=10, color='#bdc3c7')
+ax4.legend(fontsize=10, facecolor='#16213e', edgecolor='white', labelcolor='white')
+ax4.tick_params(colors='#bdc3c7')
+ax4.grid(True, alpha=0.2, axis='y')
+for spine in ax4.spines.values(): spine.set_color('#34495e')
+
+# ── ROW 3 RIGHT: Model Info ───────────────────────────────────
+ax5 = fig.add_axes([0.55, 0.05, 0.42, 0.28])
+ax5.set_facecolor('#16213e')
+ax5.set_xticks([]); ax5.set_yticks([])
+ax5.set_title('Model Configuration', fontsize=13, color='white', pad=10)
+for spine in ax5.spines.values(): spine.set_color('#34495e')
+
+info_lines = [
+    f"Architecture:  Standard 2D U-Net (64>128>256>512>1024)",
+    f"Parameters:    {sum(p.numel() for p in model.parameters()):,}",
+    f"Loss Function: 0.5 x BCE + 0.5 x Dice (no pos_weight)",
+    f"Optimizer:     Adam (lr=1e-4)",
+    f"Batch Size:    32",
+    f"Best Epoch:    {ckpt['epoch']}",
+    f"Val Loss:      {ckpt['val_loss']:.6f}",
+    f"Dataset:       LiTS17 ({len(eval_ds):,} val samples)",
+    f"Input Size:    256 x 256 (grayscale)",
+    f"AMP:           Mixed Precision (fp16/fp32)",
+]
+for i, line in enumerate(info_lines):
+    ax5.text(0.05, 0.92 - i * 0.095, line, ha='left', va='center',
+             fontsize=10, color='#bdc3c7', transform=ax5.transAxes,
+             fontfamily='monospace')
+
+plt.savefig('results/evaluation_dashboard.png', dpi=150,
+            bbox_inches='tight', facecolor='#1a1a2e')
+plt.show()
+print("\n💾 Saved to results/evaluation_dashboard.png")
+
+# ── Final Summary ─────────────────────────────────────────────
+print("\n" + "=" * 70)
+print("  ✅ EVALUATION COMPLETE")
+print("=" * 70)
+print(f"\n  📁 All outputs saved to results/")
+print(f"     ├── evaluation_metrics.csv     — full metrics table")
+print(f"     ├── detailed_predictions.png   — real vs predicted comparison")
+print(f"     ├── dice_distribution.png      — per-sample Dice histograms")
+print(f"     ├── evaluation_dashboard.png   — publication-quality dashboard")
+print(f"     └── training_curves.png        — loss and Dice curves")
+print(f"\n  🏆 Final Scores:")
+print(f"     Liver Dice:    {metrics['Liver']['Dice']:.4f}")
+print(f"     Tumor Dice:    {metrics['Tumor']['Dice']:.4f}")
+print(f"     Mean Dice:     {mean_dice:.4f}")
+print(f"     Pixel Accuracy: {pixel_acc*100:.2f}%")
+print("=" * 70)

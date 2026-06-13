@@ -26,3 +26,39 @@ models/*
 data/*
 !data/raw/
 !data/processed/
+
+# Firebase & Google Credentials (NEVER commit service account JSONs)
+firebase-service-account.json
+*-service-account.json
+*.key.json
+*firebase-adminsdk*.json
+*firebase*.json
+*-adminsdk-*.json
+credentials.json
+secrets.json
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+*.env
+app/backend/.env
+app/frontend/.env
+
+# Large model checkpoints
+*.pth
+*.pt
+*.onnx
+*.h5
+
+# Local scan data, uploads, and cached inputs (patient scans)
+app/backend/static/scans/
+app/backend/static/uploads/
+app/backend/static/temp/
+app/backend/model_test_error.txt
+
+# Frontend build artifacts
+app/frontend/node_modules/
+app/frontend/dist/
+app/frontend/dist-ssr/
+

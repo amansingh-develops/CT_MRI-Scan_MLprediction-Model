@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Analysis - ScanSight</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&amp;family=DM+Sans:wght@400;500;700&amp;family=JetBrains+Mono:wght@400;500&amp;family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-surface-variant": "#bec8d2",
+                        "on-surface": "#dfe2f0",
+                        "inverse-surface": "#dfe2f0",
+                        "surface-container-low": "#171c25",
+                        "surface-container": "#1b2029",
+                        "tertiary": "#ffb95f",
+                        "on-secondary-fixed-variant": "#005048",
+                        "secondary-fixed": "#71f8e4",
+                        "surface-dim": "#0f131d",
+                        "primary-fixed": "#c9e6ff",
+                        "primary": "#89ceff",
+                        "secondary-fixed-dim": "#4fdbc8",
+                        "inverse-primary": "#006591",
+                        "on-tertiary-container": "#4a2c00",
+                        "surface-tint": "#89ceff",
+                        "on-error": "#690005",
+                        "surface": "#0f131d",
+                        "on-secondary": "#003731",
+                        "secondary-container": "#04b4a2",
+                        "error": "#ffb4ab",
+                        "secondary": "#4fdbc8",
+                        "error-container": "#93000a",
+                        "on-primary": "#00344d",
+                        "outline": "#88929b",
+                        "on-primary-fixed": "#001e2f",
+                        "tertiary-fixed": "#ffddb8",
+                        "on-primary-fixed-variant": "#004c6e",
+                        "background": "#0f131d",
+                        "tertiary-fixed-dim": "#ffb95f",
+                        "outline-variant": "#3e4850",
+                        "on-secondary-fixed": "#00201c",
+                        "surface-container-lowest": "#0a0e17",
+                        "tertiary-container": "#d88a00",
+                        "primary-fixed-dim": "#89ceff",
+                        "on-tertiary-fixed-variant": "#653e00",
+                        "on-secondary-container": "#003f38",
+                        "inverse-on-surface": "#2c303b",
+                        "surface-container-highest": "#31353f",
+                        "surface-variant": "#31353f",
+                        "surface-bright": "#353944",
+                        "on-tertiary": "#472a00",
+                        "on-error-container": "#ffdad6",
+                        "on-background": "#dfe2f0",
+                        "surface-container-high": "#262a34",
+                        "on-tertiary-fixed": "#2a1700",
+                        "primary-container": "#0ea5e9",
+                        "on-primary-container": "#003751"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Syne"],
+                        "body": ["Manrope"],
+                        "label": ["DM Sans"],
+                        "mono": ["JetBrains Mono"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .scan-line {
+            animation: sweep 1.5s linear infinite;
+        }
+        @keyframes sweep {
+            0% { top: 0%; opacity: 0; }
+            5% { opacity: 1; }
+            95% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+        .amber-glow {
+            box-shadow: 0 0 40px -10px rgba(245, 158, 11, 0.25);
+        }
+        .pulse-glow {
+            animation: pulse-amber 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse-amber {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.8; box-shadow: 0 0 20px 5px rgba(245, 158, 11, 0.4); }
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body selection:bg-primary/30 min-h-screen flex">
+<!-- SideNavBar -->
+<aside class="hidden md:flex flex-col h-screen w-64 left-0 top-0 fixed bg-[#171c25] border-r border-[#3e4850]/15 py-6 z-50">
+<div class="px-6">
+<h1 class="font-['Syne'] font-extrabold text-[#89ceff] text-2xl mb-8">ScanSight</h1>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="text-slate-400 py-3 px-4 flex items-center gap-3 hover:bg-[#1b2029] hover:text-white transition-all duration-200" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-['DM_Sans'] text-sm font-medium tracking-wide">Dashboard</span>
+</a>
+<a class="bg-[#262a34] text-[#89ceff] border-l-4 border-[#0ea5e9] py-3 px-4 flex items-center gap-3 transition-transform" href="#">
+<span class="material-symbols-outlined">cloud_upload</span>
+<span class="font-['DM_Sans'] text-sm font-medium tracking-wide">Upload</span>
+</a>
+<a class="text-slate-400 py-3 px-4 flex items-center gap-3 hover:bg-[#1b2029] hover:text-white transition-all duration-200" href="#">
+<span class="material-symbols-outlined">radiology</span>
+<span class="font-['DM_Sans'] text-sm font-medium tracking-wide">My Scans</span>
+</a>
+<a class="text-slate-400 py-3 px-4 flex items-center gap-3 hover:bg-[#1b2029] hover:text-white transition-all duration-200" href="#">
+<span class="material-symbols-outlined">compare</span>
+<span class="font-['DM_Sans'] text-sm font-medium tracking-wide">Compare</span>
+</a>
+<a class="text-slate-400 py-3 px-4 flex items-center gap-3 hover:bg-[#1b2029] hover:text-white transition-all duration-200" href="#">
+<span class="material-symbols-outlined">smart_toy</span>
+<span class="font-['DM_Sans'] text-sm font-medium tracking-wide">AI Doctor</span>
+</a>
+<a class="text-slate-400 py-3 px-4 flex items-center gap-3 hover:bg-[#1b2029] hover:text-white transition-all duration-200" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-['DM_Sans'] text-sm font-medium tracking-wide">Settings</span>
+</a>
+</nav>
+<div class="mt-auto pt-6 border-t border-[#3e4850]/15 space-y-1">
+<a class="text-slate-400 py-3 px-4 flex items-center gap-3 hover:bg-[#1b2029] hover:text-white transition-all duration-200" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="font-['DM_Sans'] text-sm font-medium tracking-wide">Support</span>
+</a>
+<a class="text-slate-400 py-3 px-4 flex items-center gap-3 hover:bg-[#1b2029] hover:text-white transition-all duration-200" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-['DM_Sans'] text-sm font-medium tracking-wide">Logout</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="flex-1 md:ml-64 relative min-h-screen">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center w-full px-6 py-3 h-16 bg-[#0f131d] fixed top-0 z-40 md:w-[calc(100%-16rem)]">
+<div class="flex items-center gap-4">
+<span class="font-['Syne'] font-bold text-lg tracking-tight text-[#89ceff]">Analyzing Scan...</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-slate-400 hover:bg-[#262a34] transition-colors duration-200 rounded-full">
+<span class="material-symbols-outlined">dark_mode</span>
+</button>
+<button class="p-2 text-slate-400 hover:bg-[#262a34] transition-colors duration-200 rounded-full relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full"></span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-container-highest overflow-hidden border border-outline-variant/20">
+<img class="w-full h-full object-cover" data-alt="Portrait of a medical professional clinician with dark hair and a stethoscope in a high-tech hospital setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCDB8qgv83Twc7he6jt3Ac6Hb58RjjhxOUkiXkTep_lE99BhXSdj7DB2PhqepR3X5zGlCWcD_HOBumjLvXpQbfLBZR1Y-pk9POjkqBwLe3_SRb5UCxinBEWWrbI1N-zOcVhJCJ8x1GZ1gofKsccJyu2bwb_ep1I65XDRi4WB31ZvpkkL2vC8B22MNnyBFtTNoo_7Rnr2mv98ovNK6XajerO5bMjs3QP_vCX1uER10S-DhLsAAXeuhcnZQKZfTlgkxuelTOpJsXy7mU"/>
+</div>
+</div>
+</header>
+<!-- Analysis Content Area -->
+<section class="mt-16 p-8 flex flex-col items-center justify-center min-h-[calc(100vh-4rem)]">
+<!-- Main Analysis Card -->
+<div class="w-full max-w-[800px] bg-surface-container border-2 border-tertiary/20 rounded-xl overflow-hidden amber-glow flex flex-col">
+<!-- Progress Header -->
+<div class="p-6 bg-surface-container-low flex flex-col gap-4">
+<div class="flex justify-between items-center">
+<div class="flex items-center gap-3">
+<span class="w-3 h-3 bg-tertiary rounded-full animate-pulse"></span>
+<h2 class="font-headline text-lg text-on-surface">Analyzing Tissue Density...</h2>
+</div>
+<span class="font-mono text-sm text-tertiary">74% Complete</span>
+</div>
+<div class="w-full h-1.5 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-tertiary w-[74%] transition-all duration-500 ease-out shadow-[0_0_10px_rgba(255,185,95,0.5)]"></div>
+</div>
+</div>
+<!-- Viewer Area -->
+<div class="relative aspect-video bg-black flex items-center justify-center overflow-hidden">
+<!-- The CT Scan Image -->
+<img class="w-full h-full object-contain opacity-80" data-alt="Black and white high resolution CT scan slice of a human thoracic cavity with visible ribs and lungs in a medical diagnostic view" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCdOZg6EMwrEbUdWa2OWTNs33BHFaYycu_N9sZK8iwb7yBmIO_1BwyfdRZWdTX1XZjKbVu9Eq5EyFRTkvjFsY6dj8SFAE2npKjxRTkeQd1UAIDezDHp-jRulayLZs_ktzVV-GdoHZIUC5x6fqAtBuPgYr9CYYJP29Lxno5keGwV8wJCGJI0eRvZ9ENlsNMhIldzGtaVU2ZtWXmSyQwL5i4H6VMx0cyzue5H4TTljMbUK9roEt-q2U80gqpmgZI6LEZYL_a8-RjqPhU"/>
+<!-- Scan Line Overlay -->
+<div class="absolute left-0 right-0 h-0.5 bg-cyan-400 scan-line shadow-[0_0_15px_#22d3ee] z-10"></div>
+<!-- HUD Overlays -->
+<div class="absolute top-4 left-4 flex flex-col gap-1 z-20">
+<span class="font-mono text-[10px] text-cyan-400 bg-black/40 px-2 py-0.5 rounded backdrop-blur-md">SLICE: 23 / 47</span>
+<span class="font-mono text-[10px] text-cyan-400 bg-black/40 px-2 py-0.5 rounded backdrop-blur-md">COORD: X.442 Y.219</span>
+</div>
+<div class="absolute bottom-4 right-4 z-20">
+<div class="bg-black/60 border border-tertiary/30 backdrop-blur-md p-3 rounded-lg flex flex-col gap-1">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 bg-tertiary rounded-full"></span>
+<span class="font-mono text-[11px] text-on-surface">Anomaly probability: 0.82</span>
+</div>
+<div class="font-mono text-[10px] text-on-surface-variant">Voxel Analysis: Pending</div>
+</div>
+</div>
+</div>
+<!-- Status Log (Monospace Panel) -->
+<div class="p-6 bg-surface-container-lowest border-t border-outline-variant/15">
+<div class="flex items-center gap-2 mb-4 text-xs font-label uppercase tracking-widest text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px]">terminal</span>
+                        System Process Logs
+                    </div>
+<div class="space-y-2 font-mono text-[12px] leading-relaxed max-h-40 overflow-y-auto scrollbar-hide">
+<div class="flex gap-4">
+<span class="text-outline">[00:01]</span>
+<span class="text-on-surface-variant">Initializing neural network weights... Success.</span>
+</div>
+<div class="flex gap-4">
+<span class="text-outline">[00:03]</span>
+<span class="text-on-surface-variant">Loading DICOM series #4289-B... Completed.</span>
+</div>
+<div class="flex gap-4">
+<span class="text-outline">[00:07]</span>
+<span class="text-on-surface-variant">Mapping pulmonary structural boundaries...</span>
+</div>
+<div class="flex gap-4">
+<span class="text-outline">[00:09]</span>
+<span class="text-tertiary font-bold animate-pulse">Anomaly signal detected in Segment-7L...</span>
+</div>
+<div class="flex gap-4">
+<span class="text-outline">[00:11]</span>
+<span class="text-on-surface-variant">Recalculating Hounsfield Units for region R-2...</span>
+</div>
+<div class="flex gap-4">
+<span class="text-outline">[00:12]</span>
+<span class="text-cyan-400">Enhancing localized contrast at slice 23...</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Action Buttons Footer (Contextual) -->
+<div class="mt-8 flex gap-4 opacity-70">
+<button class="flex items-center gap-2 px-6 py-3 rounded-xl border border-outline-variant text-sm font-medium text-on-surface-variant hover:bg-surface-container transition-all cursor-not-allowed">
+<span class="material-symbols-outlined">pause</span>
+                    Pause Process
+                </button>
+<button class="flex items-center gap-2 px-6 py-3 rounded-xl bg-surface-container-high border border-outline-variant/30 text-sm font-medium text-on-surface hover:border-error/50 transition-all">
+<span class="material-symbols-outlined">close</span>
+                    Abort Analysis
+                </button>
+</div>
+</section>
+<!-- Pulsing AI Button -->
+<button class="fixed bottom-8 right-8 w-16 h-16 rounded-full bg-gradient-to-br from-tertiary to-tertiary-container flex items-center justify-center text-on-tertiary shadow-xl pulse-glow z-50">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+</button>
+</main>
+<!-- Mobile Navigation (Hidden on desktop) -->
+<nav class="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface-container border-t border-outline-variant/10 flex items-center justify-around px-2 z-50">
+<a class="flex flex-col items-center gap-1 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-[10px] font-label">Home</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-primary" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">cloud_upload</span>
+<span class="text-[10px] font-label">Scan</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined">radiology</span>
+<span class="text-[10px] font-label">Library</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-[10px] font-label">Profile</span>
+</a>
+</nav>
+</body></html>

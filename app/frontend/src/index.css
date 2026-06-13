@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #F1F5F9;
+    --surface: #FFFFFF;
+    --surface-container-lowest: #F8FAFC;
+    --surface-container-low: #F1F5F9;
+    --surface-container: #E2E8F0;
+    --surface-container-high: #CBD5E1;
+    --surface-container-highest: #94A3B8;
+    --primary: #0EA5E9;
+    --primary-container: #0284C7;
+    --on-primary: #FFFFFF;
+    --secondary: #10B981;
+    --tertiary: #F59E0B;
+    --error: #EF4444;
+    --outline-variant: #CBD5E1;
+    --on-surface: #0F172A;
+    --on-surface-variant: #475569;
+  }
+
+  html.dark {
+    --background: #070B14;
+    --surface: #0F131D;
+    --surface-container-lowest: #0A0E17;
+    --surface-container-low: #171C25;
+    --surface-container: #1B2029;
+    --surface-container-high: #262A34;
+    --surface-container-highest: #31353F;
+    --primary: #0EA5E9;
+    --primary-container: #007BFF;
+    --on-primary: #FFFFFF;
+    --secondary: #10B981;
+    --tertiary: #F59E0B;
+    --error: #EF4444;
+    --outline-variant: #3E4850;
+    --on-surface: #DFE2F0;
+    --on-surface-variant: #BEC8D2;
+  }
+
+  body {
+    @apply bg-background text-on-surface font-body antialiased;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-surface-container-high rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-surface-container-highest;
+}
+
+/* Chrome Autofill dark mode override */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active{
+    -webkit-box-shadow: 0 0 0 30px #0a0e17 inset !important;
+    -webkit-text-fill-color: #dfe2f0 !important;
+    transition: background-color 5000s ease-in-out 0s;
+}

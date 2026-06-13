@@ -1,0 +1,112 @@
+6.2s 1 0.00s - Debugger warning: It seems that frozen modules are being used, which may
+6.2s 2 0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off
+6.2s 3 0.00s - to python to disable frozen modules.
+6.2s 4 0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.
+6.8s 5 0.00s - Debugger warning: It seems that frozen modules are being used, which may
+6.8s 6 0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off
+6.8s 7 0.00s - to python to disable frozen modules.
+6.8s 8 0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.
+13.4s 9 Device: cuda
+13.4s 10 GPU: Tesla T4
+13.4s 11 VRAM: 15.6 GB
+13.4s 12 Data root: /kaggle/input/datasets/andrewmvd/lits-png/dataset_6
+13.4s 13 Run name: balanced_best_seed42_1776809021
+13.6s 14 Using paths:
+13.6s 15 data_root: /kaggle/input/datasets/andrewmvd/lits-png/dataset_6
+13.6s 16 train_csv: /kaggle/input/datasets/andrewmvd/lits-png/lits_train.csv
+13.6s 17 val_csv: /kaggle/input/datasets/amanbhadoriya69/lits-validation/lits_val.csv
+13.6s 18 test_csv: /kaggle/input/datasets/andrewmvd/lits-png/lits_test.csv
+13.6s 19 probe_csv: /kaggle/input/datasets/andrewmvd/lits-png/lits_probe.csvc
+13.6s 20 all_csv: /kaggle/input/datasets/andrewmvd/lits-png/lits_df.csv
+14.0s 21 Rows:
+14.0s 22 train: 38,523
+14.0s 23 val: 17,077
+14.0s 24 test: 3,038
+14.0s 25 all: 58,638
+14.0s 26 
+14.0s 27 Cardinality check:
+14.0s 28 train+val+test = 58,638
+14.0s 29 all            = 58,638
+14.0s 30 
+14.0s 31 Study overlap:
+14.0s 32 train∩val : 0
+14.0s 33 train∩test: 0
+14.0s 34 val∩test  : 0
+14.0s 35 
+14.0s 36 Row overlap:
+14.0s 37 train∩val : 0
+14.0s 38 train∩test: 0
+14.0s 39 val∩test  : 0
+14.2s 40 Data root auto-corrected: /kaggle/input/datasets/andrewmvd/lits-png/dataset_6 -> /kaggle/input/datasets/andrewmvd/lits-png/dataset_6/dataset_6
+14.2s 41 TRAIN | rows=38,523 | liver+= 68.51% | tumor+= 88.29%
+14.2s 42 VAL | rows=17,077 | liver+= 65.95% | tumor+= 86.88%
+14.2s 43 TEST | rows=3,038 | liver+= 60.50% | tumor+= 88.05%
+79.8s 44 
+79.8s 45 Audit summary:
+79.8s 46 audited rows    : 3000
+79.8s 47 missing triples : 0
+79.8s 48 unreadable      : 0
+79.8s 49 shape mismatches: 0
+79.8s 50 image mean(avg) : 72.91
+79.8s 51 mask unique vals: [0, 1]
+79.8s 52 liver pixel+ %  : 2.172
+79.8s 53 tumor pixel+ %  : 0.1273
+79.8s 54 Preprocess policy | CLAHE=True | median=True | tumor_px_mean=0.001273
+79.8s 55 train batches: 2408 | val batches: 1068 | test batches: 190
+80.4s 56 Model parameters: 31,036,546
+128.4s 57 Smoke test passed.
+133.1s 58 /tmp/ipykernel_23/1496004879.py:118: RuntimeWarning: Mean of empty slice
+133.1s 59 out["mean_dice_fg"] = np.nanmean([out["liver_dice_fg"], out["tumor_dice_fg"]])
+133.1s 60 
+133.1s 61 /tmp/ipykernel_23/1496004879.py:118: RuntimeWarning: Mean of empty slice
+133.1s 62 out["mean_dice_fg"] = np.nanmean([out["liver_dice_fg"], out["tumor_dice_fg"]])
+1539.0s 63 Epoch 001 | train_loss=0.6658 | val_loss=0.5224 | tumor=0.8685 | liver=0.8353 | fp_rate=0.00000 | out_liver=0.0000 | score=0.7690 | guards=NO | no_improve=0/18 | elapsed=0.39h/11.5h
+2824.5s 64 Epoch 002 | train_loss=0.5005 | val_loss=0.4568 | tumor=0.8685 | liver=0.7734 | fp_rate=0.00000 | out_liver=0.0000 | score=0.7455 | guards=NO | no_improve=1/18 | elapsed=0.75h/11.5h
+4113.6s 65 Epoch 003 | train_loss=0.4754 | val_loss=0.4414 | tumor=0.8685 | liver=0.8927 | fp_rate=0.00000 | out_liver=0.0000 | score=0.7908 | guards=NO | no_improve=2/18 | elapsed=1.11h/11.5h
+5401.1s 66 Epoch 004 | train_loss=0.4683 | val_loss=0.4323 | tumor=0.7558 | liver=0.7312 | fp_rate=0.00071 | out_liver=0.0878 | score=0.6673 | guards=NO | no_improve=3/18 | elapsed=1.46h/11.5h
+6685.5s 67 Epoch 005 | train_loss=0.4661 | val_loss=0.4330 | tumor=0.7977 | liver=0.8721 | fp_rate=0.00045 | out_liver=0.0595 | score=0.7438 | guards=NO | no_improve=4/18 | elapsed=1.82h/11.5h
+7970.7s 68 Epoch 006 | train_loss=0.4637 | val_loss=0.4312 | tumor=0.8302 | liver=0.8747 | fp_rate=0.00008 | out_liver=0.1113 | score=0.7596 | guards=NO | no_improve=5/18 | elapsed=2.18h/11.5h
+9336.5s 69 Epoch 007 | train_loss=0.4627 | val_loss=0.4266 | tumor=0.8410 | liver=0.8565 | fp_rate=0.00017 | out_liver=0.0689 | score=0.7600 | guards=NO | no_improve=6/18 | elapsed=2.56h/11.5h
+10624.2s 70 Epoch 008 | train_loss=0.4595 | val_loss=0.4243 | tumor=0.8456 | liver=0.8513 | fp_rate=0.00020 | out_liver=0.0645 | score=0.7606 | guards=NO | no_improve=7/18 | elapsed=2.92h/11.5h
+11906.3s 71 Epoch 009 | train_loss=0.4602 | val_loss=0.4269 | tumor=0.7865 | liver=0.9057 | fp_rate=0.00038 | out_liver=0.0657 | score=0.7505 | guards=NO | no_improve=8/18 | elapsed=3.27h/11.5h
+13189.8s 72 Epoch 010 | train_loss=0.4580 | val_loss=0.4263 | tumor=0.8575 | liver=0.8542 | fp_rate=0.00013 | out_liver=0.0598 | score=0.7681 | guards=NO | no_improve=9/18 | elapsed=3.63h/11.5h
+14465.0s 73 Epoch 011 | train_loss=0.4587 | val_loss=0.4261 | tumor=0.8573 | liver=0.8568 | fp_rate=0.00012 | out_liver=0.0719 | score=0.7685 | guards=NO | no_improve=10/18 | elapsed=3.98h/11.5h
+15743.2s 74 Epoch 012 | train_loss=0.4580 | val_loss=0.4184 | tumor=0.8469 | liver=0.8497 | fp_rate=0.00024 | out_liver=0.0576 | score=0.7610 | guards=NO | no_improve=11/18 | elapsed=4.34h/11.5h
+17029.9s 75 Epoch 013 | train_loss=0.4577 | val_loss=0.4194 | tumor=0.8585 | liver=0.8767 | fp_rate=0.00014 | out_liver=0.0471 | score=0.7777 | guards=NO | no_improve=12/18 | elapsed=4.69h/11.5h
+18311.3s 76 Epoch 014 | train_loss=0.4561 | val_loss=0.4185 | tumor=0.8444 | liver=0.9229 | fp_rate=0.00028 | out_liver=0.0367 | score=0.7883 | guards=NO | no_improve=13/18 | elapsed=5.05h/11.5h
+19589.7s 77 Epoch 015 | train_loss=0.4563 | val_loss=0.4240 | tumor=0.8793 | liver=0.9016 | fp_rate=0.00007 | out_liver=0.0225 | score=0.7990 | guards=NO | no_improve=14/18 | elapsed=5.41h/11.5h
+20870.9s 78 Epoch 016 | train_loss=0.4557 | val_loss=0.4177 | tumor=0.8432 | liver=0.8790 | fp_rate=0.00020 | out_liver=0.0220 | score=0.7716 | guards=NO | no_improve=15/18 | elapsed=5.76h/11.5h
+22152.8s 79 Epoch 017 | train_loss=0.4559 | val_loss=0.4183 | tumor=0.8545 | liver=0.9136 | fp_rate=0.00031 | out_liver=0.0276 | score=0.7904 | guards=NO | no_improve=16/18 | elapsed=6.12h/11.5h
+23432.6s 80 Epoch 018 | train_loss=0.4561 | val_loss=0.4200 | tumor=0.8688 | liver=0.9314 | fp_rate=0.00011 | out_liver=0.0136 | score=0.8051 | guards=OK | no_improve=0/18 | elapsed=6.47h/11.5h
+24718.9s 81 Epoch 019 | train_loss=0.3570 | val_loss=0.2425 | tumor=0.8685 | liver=0.9000 | fp_rate=0.00000 | out_liver=0.0000 | score=0.7936 | guards=NO | no_improve=1/18 | elapsed=6.83h/11.5h
+25995.8s 82 Epoch 020 | train_loss=0.2192 | val_loss=0.2271 | tumor=0.8845 | liver=0.9291 | fp_rate=0.00006 | out_liver=0.0005 | score=0.8130 | guards=NO | no_improve=2/18 | elapsed=7.19h/11.5h
+27267.0s 83 Epoch 021 | train_loss=0.2158 | val_loss=0.2229 | tumor=0.8989 | liver=0.8646 | fp_rate=0.00012 | out_liver=0.0001 | score=0.7960 | guards=NO | no_improve=3/18 | elapsed=7.54h/11.5h
+28533.1s 84 Epoch 022 | train_loss=0.2165 | val_loss=0.2370 | tumor=0.8735 | liver=0.9208 | fp_rate=0.00001 | out_liver=0.0003 | score=0.8041 | guards=NO | no_improve=4/18 | elapsed=7.89h/11.5h
+29797.3s 85 Epoch 023 | train_loss=0.2163 | val_loss=0.2368 | tumor=0.8794 | liver=0.8768 | fp_rate=0.00001 | out_liver=0.0002 | score=0.7905 | guards=NO | no_improve=5/18 | elapsed=8.24h/11.5h
+31058.5s 86 Epoch 024 | train_loss=0.2146 | val_loss=0.2330 | tumor=0.8762 | liver=0.9041 | fp_rate=0.00000 | out_liver=0.0009 | score=0.7991 | guards=NO | no_improve=6/18 | elapsed=8.59h/11.5h
+32314.7s 87 Epoch 025 | train_loss=0.2157 | val_loss=0.2243 | tumor=0.8912 | liver=0.9051 | fp_rate=0.00004 | out_liver=0.0000 | score=0.8073 | guards=NO | no_improve=7/18 | elapsed=8.94h/11.5h
+33600.1s 88 Epoch 026 | train_loss=0.2160 | val_loss=0.2284 | tumor=0.8849 | liver=0.9122 | fp_rate=0.00003 | out_liver=0.0002 | score=0.8067 | guards=NO | no_improve=8/18 | elapsed=9.30h/11.5h
+34861.5s 89 Epoch 027 | train_loss=0.2153 | val_loss=0.2249 | tumor=0.8924 | liver=0.9005 | fp_rate=0.00008 | out_liver=0.0001 | score=0.8062 | guards=NO | no_improve=9/18 | elapsed=9.65h/11.5h
+36132.5s 90 Epoch 028 | train_loss=0.2126 | val_loss=0.2228 | tumor=0.8909 | liver=0.8798 | fp_rate=0.00006 | out_liver=0.0000 | score=0.7976 | guards=NO | no_improve=10/18 | elapsed=10.00h/11.5h
+37401.8s 91 Epoch 029 | train_loss=0.2117 | val_loss=0.2303 | tumor=0.8814 | liver=0.8638 | fp_rate=0.00002 | out_liver=0.0001 | score=0.7865 | guards=NO | no_improve=11/18 | elapsed=10.35h/11.5h
+38658.7s 92 Epoch 030 | train_loss=0.2126 | val_loss=0.2265 | tumor=0.8910 | liver=0.8622 | fp_rate=0.00003 | out_liver=0.0002 | score=0.7910 | guards=NO | no_improve=12/18 | elapsed=10.70h/11.5h
+39914.2s 93 Epoch 031 | train_loss=0.2127 | val_loss=0.2160 | tumor=0.9049 | liver=0.8899 | fp_rate=0.00012 | out_liver=0.0002 | score=0.8087 | guards=NO | no_improve=13/18 | elapsed=11.05h/11.5h
+41166.2s 94 Epoch 032 | train_loss=0.2123 | val_loss=0.2176 | tumor=0.8982 | liver=0.9044 | fp_rate=0.00019 | out_liver=0.0001 | score=0.8107 | guards=NO | no_improve=14/18 | elapsed=11.40h/11.5h
+42424.9s 95 Epoch 033 | train_loss=0.2127 | val_loss=0.2161 | tumor=0.9023 | liver=0.9057 | fp_rate=0.00013 | out_liver=0.0001 | score=0.8133 | guards=NO | no_improve=15/18 | elapsed=11.75h/11.5h
+42424.9s 96 Reached max_run_hours=11.5. Stopping safely for resume.
+42424.9s 97 Best checkpoint: models/best_model_tumor_dice.pth
+42424.9s 98 Best clinical score: 0.8051
+42424.9s 99 Best tumor dice: 0.8688
+42424.9s 100 Latest checkpoint: models/latest_model.pth
+42424.9s 101 Training log: results/training_log.csv
+42425.9s 102 Best epoch by val_tumor_dice_all:
+42425.9s 103 epoch                 31.000000
+42425.9s 104 val_tumor_dice_all     0.904861
+42425.9s 105 val_liver_dice_all     0.889899
+42425.9s 106 val_loss               0.216000
+42425.9s 107 Name: 30, dtype: float64
+42427.2s 108 /tmp/ipykernel_23/1496004879.py:118: RuntimeWarning: Mean of empty slice
+42427.2s 109 out["mean_dice_fg"] = np.nanmean([out["liver_dice_fg"], out["tumor_dice_fg"]])
+42427.2s 110 
+42427.2s 111 /tmp/ipykernel_23/1496004879.py:118: RuntimeWarning: Mean of empty slice
+42427.2s 112 out["mean_dice_fg"] = np.nanmean([out["liver_dice_fg"], out["tumor_dice_fg"]])

@@ -1,0 +1,58 @@
+# Final report table + continue/stop training guidance
+display_cols = ["split", "channel", "dice", "iou", "precision", "recall", "f1", "accuracy", "fp", "fn"]
+report_pivot = report_df[display_cols].copy()
+report_pivot.to_csv(Path(CFG["save_dir"]) / "report_table.csv", index=False)
+print(report_pivot)
+
+# Save config used for this run
+with open(Path(CFG["save_dir"]) / "run_config.json", "w", encoding="utf-8") as f:
+    json.dump({k: (float(v) if isinstance(v, np.floating) else v) for k, v in CFG.items()}, f, indent=2)
+
+# Practical training decision guidance
+tumor_val = float(report_df[(report_df.split == "val") & (report_df.channel == "tumor")]["dice"].iloc[0])
+tumor_test = float(report_df[(report_df.split == "test") & (report_df.channel == "tumor")]["dice"].iloc[0])
+val_test_gap = tumor_val - tumor_test
+
+test_tumor_fp_rate = float(report_df[(report_df.split == "test") & (report_df.channel == "tumor")]["fp"].iloc[0]) / max(
+    1.0,
+    float(report_df[(report_df.split == "test") & (report_df.channel == "tumor")]["fp"].iloc[0]) +
+    float(report_df[(report_df.split == "test") & (report_df.channel == "tumor")]["tn"].iloc[0]),
+)
+
+if tumor_val < 0.55:
+    decision = "CONTINUE: model underfitting for tumor; run Stage-B finetuning and/or stronger tumor loss."
+elif val_test_gap > 0.06:
+    decision = "STOP and REGULARIZE: overfitting likely; keep best checkpoint, tune augment/loss, then retrain."
+else:
+    decision = "STOP: good generalization; use this checkpoint for final reporting and inference."
+
+test_liver_dice = float(report_df[(report_df.split == "test") & (report_df.channel == "liver")]["dice"].iloc[0])
+val_liver_dice = float(report_df[(report_df.split == "val") & (report_df.channel == "liver")]["dice"].iloc[0])
+
+# tumor outside liver proxy from confusion table is not directly available; we use val tracked metric if present
+val_outside_proxy = float(log_df["val_tumor_outside_liver_rate"].dropna().iloc[-1]) if "val_tumor_outside_liver_rate" in log_df.columns and len(log_df) > 0 else 0.0
+
+ready_for_aggressive = (
+    PRESET_NAME == "balanced_best"
+    and tumor_val >= STAGE_GATE["min_val_tumor_dice"]
+    and tumor_test >= STAGE_GATE["min_test_tumor_dice"]
+    and val_liver_dice >= STAGE_GATE["min_val_liver_dice"]
+    and test_liver_dice >= STAGE_GATE["min_test_liver_dice"]
+    and val_test_gap <= STAGE_GATE["max_val_test_tumor_gap"]
+    and test_tumor_fp_rate <= STAGE_GATE["max_test_tumor_fp_rate"]
+    and val_outside_proxy <= STAGE_GATE["max_test_tumor_outside_liver_rate"]
+)
+
+if ready_for_aggressive:
+    stage_msg = "PROMOTE: Balanced goal achieved. Switch PRESET_NAME to aggressive_max_accuracy."
+else:
+    stage_msg = "HOLD: Continue balanced_best until gate metrics are met."
+
+with open(Path(CFG["save_dir"]) / "training_decision.txt", "w", encoding="utf-8") as f:
+    f.write(decision + "\n")
+    f.write(stage_msg + "\n")
+
+print("Notebook pipeline complete.")
+print(f"Decision: {decision}")
+print(f"Stage gate: {stage_msg}")
+print(f"Artifacts in: {CFG['save_dir']} and {CFG['model_dir']}")
